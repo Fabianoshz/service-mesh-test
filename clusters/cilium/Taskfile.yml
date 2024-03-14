@@ -1,0 +1,110 @@
+version: '3'
+tasks:
+  create-cluster:
+    summary: "Creates the '{{.CLUSTER_NAME}}' cluster"
+    cmds:
+      - kind create cluster --config=config.yaml
+    status:
+      - kind get clusters |grep {{.CLUSTER_NAME}}}
+
+  delete-cluster:
+    summary: "Deletes the '{{.CLUSTER_NAME}}' cluster"
+    cmds:
+      - kind delete cluster --name={{.CLUSTER_NAME}}
+    preconditions:
+      - kind get clusters |grep {{.CLUSTER_NAME}}
+
+  create-base-services:
+    summary: Creates the base resources for testing
+    cmds:
+      - kubectl apply -f ../../../yaml/manifests.yaml
+
+  create-base-cilium-services:
+    summary: | 
+      Creates the base resources specific for cilium testing:
+
+      deathstar - An API that have 2 endpoints:
+        - v1/request-landing (should only be accessed by tiefighter)
+        - v1/exhaust-port (no one should access)
+
+      tiefigher - A service that access the deathstar
+      xwing - A service that access the deathstar
+
+    cmds:
+      - kubectl apply -f ./yaml/http-sw-app.yaml
+
+  delete-base-cilium-services:
+    summary: "Deletes the default resources for cilium testing"
+    cmds:
+      - kubectl delete -f ./yaml/http-sw-app.yaml
+
+  create-l4-policy-network:
+    summary: |
+      Add the L4 policy network rules.
+
+      You can test them with:
+        - go-task test-block-l4-policy-network
+        - go-task test-allow-l4-policy-network
+
+    cmds:
+      - kubectl apply -f ./yaml/l4-network-policy.yaml
+
+  delete-l4-policy-network:
+    cmds:
+      - kubectl delete -f ./yaml/l4-network-policy.yaml
+
+  test-block-l4-policy-network:
+    cmds:
+      - kubectl exec xwing -- curl -m 2 -s -XPOST deathstar.default.svc.cluster.local/v1/request-landing
+
+  test-allow-l4-policy-network:
+    cmds:
+      - kubectl exec tiefighter -- curl -s -XPOST deathstar.default.svc.cluster.local/v1/request-landing
+
+  create-l7-policy-network:
+    summary: |
+      Add the L7 policy network rules.
+
+      You can test them with:
+        - go-task test-block-l7-policy-network
+        - go-task test-allow-l7-policy-network
+
+    cmds:
+      - kubectl delete -f ./yaml/l4-network-policy.yaml
+      - kubectl apply -f ./yaml/l7-network-policy.yaml
+
+  delete-l7-policy-network:
+    cmds:
+      - kubectl delete -f ./yaml/l7-network-policy.yaml
+
+  test-block-l7-policy-network:
+    cmds:
+      - kubectl exec tiefighter -- curl -s -XPUT deathstar.default.svc.cluster.local/v1/exhaust-port
+      - kubectl exec xwing -- curl -m 2 -s -XPOST deathstar.default.svc.cluster.local/v1/request-landing
+
+  test-allow-l7-policy-network:
+    cmds:
+      - kubectl exec tiefighter -- curl -s -XPOST deathstar.default.svc.cluster.local/v1/request-landing
+
+  hubble-observe:
+    summary: |
+      Provides a quick look of the network events.
+
+      If you want to look at more information run the following commands:
+        - cilium-cli hubble port-forward &
+        - hubble observe
+
+      You can stop the background process with:
+        - fg # This pull to the foreground the background process
+        - ctrl + c # To stop the running process
+
+    cmds:
+      - task: hubble-port-forward
+      - hubble observe
+      - defer: kill $(pgrep --full --list-full --parent $$ "cilium-cli hubble port-forward" | cut -d " " -f1)
+
+  hubble-port-forward:
+    internal: true
+    cmds:
+      - cilium-cli hubble port-forward &
+      - pgrep --full --list-full --parent $$ "cilium-cli hubble port-forward" | cut -d " " -f1

@@ -1,0 +1,40 @@
+repositories:
+- name: cilium
+  url: https://helm.cilium.io/
+
+releases:
+- name: cilium
+  namespace: kube-system
+  chart: cilium/cilium
+  version: 1.15.1
+  set:
+  - name: image.pullPolicy
+    value: IfNotPresent
+  - name: ipam.mode
+    value: kubernetes
+
+  # https://docs.cilium.io/en/stable/gettingstarted/hubble_setup/#hubble-setup
+  - name: hubble.relay.enabled
+    value: true
+  - name: hubble.ui.enabled
+    value: true
+
+  # https://docs.cilium.io/en/latest/network/kubernetes/kubeproxy-free/#kubeproxy-free
+  - name: kubeProxyReplacement
+    value: true
+  - name: k8sServiceHost
+    value: 172.18.0.2
+  - name: k8sServicePort
+    value: 6443
+
+  # Disabled because gateway API can replace it and it also supports traffic splitting
+  # https://docs.cilium.io/en/stable/network/servicemesh/ingress/
+  # - name: ingressController.enabled
+  #   value: true
+  # - name: ingressController.loadBalancerMode
+  #   value: dedicated
+
+  # https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/gateway-api/#installation
+  - name: gatewayAPI.enabled
+    value: true
+

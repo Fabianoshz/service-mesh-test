@@ -1,0 +1,20 @@
+repositories:
+- name: cilium
+  url: https://helm.cilium.io/
+
+releases:
+- name: cilium
+  namespace: kube-system
+  chart: cilium/cilium
+  version: 1.15.1
+  set:
+  - name: image.pullPolicy
+    value: IfNotPresent
+  - name: ipam.mode
+    value: kubernetes
+
+  # https://docs.cilium.io/en/stable/gettingstarted/hubble_setup/#hubble-setup
+  - name: hubble.relay.enabled
+    value: true
+  - name: hubble.ui.enabled
+    value: true

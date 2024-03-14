@@ -1,0 +1,39 @@
+version: '3'
+
+includes:
+  backend:
+    taskfile: ../Taskfile.yml
+    vars:
+      CLUSTER_NAME: cilium-test-kube-proxyless
+
+tasks:
+  install-cilium:
+    summary: "Install cilium from helmfile"
+    deps: [add-gateway-api, add-load-balancer]
+    cmds:
+      - helmfile apply --file helmfile.d/cilium.yaml --set k8sServiceHost={{.IP_ADDRESS}} 
+    vars:
+      # TODO: use the ip address from the control plane to configure cilium
+    #   IP_ADDRESS:
+    #     sh: docker inspect -f '{{.NetworkSettings.Networks.kind.IPAddress}}' cilium-test-kube-proxyless-control-plane
+      IP_ADDRESS: 172.18.0.5
+    preconditions:
+      - kind get clusters |grep cilium-test-kube-proxyless
+
+  add-load-balancer:
+    summary: "Add MetalLB to cluster to allow usage of the Load Balacner services"
+    cmds:
+      - kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.7/config/manifests/metallb-native.yaml
+      - kubectl wait --namespace metallb-system --for=condition=ready pod --selector=app=metallb
+      # TODO: update the metallb network range
+      # - docker network inspect -f '{{.IPAM.Config}}' kind
+      - kubectl apply -f yaml/metallb.yaml
+
+  add-gateway-api:
+    cmds:
+      - kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.0.0/config/crd/standard/gateway.networking.k8s.io_gatewayclasses.yaml
+      - kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.0.0/config/crd/standard/gateway.networking.k8s.io_gateways.yaml
+      - kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.0.0/config/crd/standard/gateway.networking.k8s.io_httproutes.yaml
+      - kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.0.0/config/crd/standard/gateway.networking.k8s.io_referencegrants.yaml
+      - kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.0.0/config/crd/experimental/gateway.networking.k8s.io_grpcroutes.yaml
+      - kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.0.0/config/crd/experimental/gateway.networking.k8s.io_tlsroutes.yaml

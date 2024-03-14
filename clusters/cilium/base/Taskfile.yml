@@ -1,0 +1,24 @@
+version: '3'
+
+includes:
+  backend:
+    taskfile: ../Taskfile.yml
+    vars:
+      CLUSTER_NAME: cilium-test-base
+
+tasks:
+  install-cilium:
+    summary: "Install cilium from helmfile"
+    cmds:
+      - helmfile apply --file helmfile.d/cilium.yaml
+    preconditions:
+      - kind get clusters |grep cilium-test
+
+  add-load-balancer:
+    summary: "Add MetalLB to cluster to allow usage of the Load Balacner services"
+    cmds:
+      - kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.7/config/manifests/metallb-native.yaml
+      - kubectl wait --namespace metallb-system --for=condition=ready pod --selector=app=metallb
+      # TODO: update the metallb network range
+      # - docker network inspect -f '{{.IPAM.Config}}' kind
+      - kubectl apply -f yaml/metallb.yaml

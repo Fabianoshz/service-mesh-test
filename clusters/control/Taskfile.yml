@@ -1,0 +1,13 @@
+version: '3'
+tasks:
+  create-cluster:
+    cmds:
+      - kind create cluster --config=config.yaml
+    status:
+      - kind get clusters |grep control-test
+
+  delete-cluster:
+    cmds:
+      - kind delete cluster --name=control-test
+    preconditions:
+      - kind get clusters |grep control-test
